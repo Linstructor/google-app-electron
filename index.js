@@ -15,6 +15,7 @@ const log = {
 const events = {
   READY: 'auth-loaded',
   AUTH_REQUEST: 'auth-request',
+  VALID_CODE: 'valid-code'
 };
 
 // If modifying these scopes, delete token.json.
