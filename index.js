@@ -46,9 +46,8 @@ function authorize(credentials) {
 /**
  * Get and store new token after prompting for user authorization, and then
  * execute the given callback with the authorized OAuth2 client.
- * @param {getEventsCallback} callback The callback for the authorized client.
  */
-function getAccessToken(callback) {
+function getAccessToken() {
   const authUrl = oauthClient.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -78,6 +77,9 @@ module.exports = (options = {}) => {
   fs.readFile(appOptions.credentialsFile)
     .then(result => authorize(JSON.parse(result)))
     .catch(err => log.e('Error loading client secret file:', err));
-  return emitter;
+  return {
+    driveEmitter: emitter,
+    events
+  };
 
 };
