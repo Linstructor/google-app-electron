@@ -1,16 +1,15 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const {google} = require('googleapis');
-const eventsPkg = require('events');
+const EventEmitter = require('events');
+class AppEmitter extends EventEmitter {}
 
+const emitter = new AppEmitter();
 let oauthClient = null;
-
-const emitter = new eventsPkg.EventEmitter();
-
-let options = {};
+let appOptions = {};
 
 const log = {
-  i: msg => {if(options.debug) console.log(msg)},
-  e: (msg, err = {}) => {if(options.debug) console.error(msg, err)},
+  i: msg => {if(appOptions.debug) console.log(msg)},
+  e: (msg, err = {}) => {if(appOptions.debug) console.error(msg, err)},
 };
 
 const events = {
@@ -20,7 +19,6 @@ const events = {
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
-const TOKEN_PATH = 'token.json';
 
 /**
  * Create an OAuth2 client with the given credentials, and then execute the
@@ -32,14 +30,17 @@ function authorize(credentials) {
   oauthClient = new google.auth.OAuth2(
     client_id, client_secret, redirect_uris[0]);
   log.i('Check if there is already an user token');
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    if (err) {
-      log.i('No user token found');
-      return getAccessToken(callback);
-    }
-    oauthClient.setCredentials(JSON.parse(token));
-    emitter.emit(events.READY);
-  });
+  fs.readFile(appOptions.tokenFile)
+    .then(token => {
+      oauthClient.setCredentials(JSON.parse(token));
+      emitter.emit(events.READY);
+    })
+    .catch(err => {
+      if (err) {
+        log.i('No user token found');
+        return getAccessToken();
+      }
+    });
 }
 
 /**
@@ -57,24 +58,26 @@ function getAccessToken(callback) {
 
 function validateCode(code) {
   oauthClient.getToken(code, (err, token) => {
-    if (err) return console.error('Error retrieving access token', err);
+    if (err) return log.e('Error retrieving access token', err);
     oauthClient.setCredentials(token);
-    // Store the token to disk for later program executions
-    fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-      if (err) console.error(err);
-      console.log('Token stored to', TOKEN_PATH);
-      emitter.emit(events.READY);
-    });
+
+    fs.writeFile(appOptions.tokenFile, JSON.stringify(token))
+      .then(() => {
+        log.i('Token stored to', appOptions.tokenFile);
+        emitter.emit(events.READY);
+      })
+      .catch(err => {throw err;});
   });
 }
 
 module.exports = (options = {}) => {
-  this.options = options;
+  if (options.tokenFile === undefined || options.tokenFile === '' || options.tokenFile === undefined) throw new Error('No token file in options');
+  if (options.credentialsFile === undefined || options.credentialsFile === '' || options.credentialsFile === undefined) throw new Error('No credentials file in options');
+  appOptions = options;
   log.i('Load google credentials');
-  fs.readFile('credentials.json', (err, content) => {
-    if (err) return log.e('Error loading client secret file:', err);
-    authorize(JSON.parse(content));
-  });
+  fs.readFile(appOptions.credentialsFile)
+    .then(result => authorize(JSON.parse(result)))
+    .catch(err => log.e('Error loading client secret file:', err));
   return {
     on: emitter.on,
     once: emitter.once,
