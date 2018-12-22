@@ -78,12 +78,6 @@ module.exports = (options = {}) => {
   fs.readFile(appOptions.credentialsFile)
     .then(result => authorize(JSON.parse(result)))
     .catch(err => log.e('Error loading client secret file:', err));
-  return {
-    on: emitter.on,
-    once: emitter.once,
-    listeners: emitter.listeners,
-    removeListener: emitter.removeListener,
-    validateCode: validateCode,
-    events: events
-  }
+  return emitter;
+
 };
