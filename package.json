@@ -1,0 +1,25 @@
+{
+  "name": "google-app-electron",
+  "version": "1.0.0",
+  "description": "Google service in app manager",
+  "main": "index.js",
+  "scripts": {
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Linstructor/google-app-electron.git"
+  },
+  "author": "Tristan Morisot",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Linstructor/google-app-electron/issues"
+  },
+  "homepage": "https://github.com/Linstructor/google-app-electron#readme",
+  "dependencies": {
+    "googleapis": "^27.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^5.10.0",
+    "eslint-config-google": "^0.11.0"
+  }
+}
