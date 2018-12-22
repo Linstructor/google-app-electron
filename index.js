@@ -69,12 +69,15 @@ function validateCode(code) {
   });
 }
 
-module.exports = (options = {}) => {
-  if (options.tokenFile === undefined || options.tokenFile === '' || options.tokenFile === undefined) throw new Error('No token file in options');
-  if (options.credentialsFile === undefined || options.credentialsFile === '' || options.credentialsFile === undefined) throw new Error('No credentials file in options');
+function manageOptions(options) {
+  if (options.tokenFile === undefined || options.tokenFile === '') throw new Error('No token file in options');
+  if (options.credentialsFile === undefined || options.credentialsFile === '') throw new Error('No credentials file in options');
   appOptions = options;
+}
+
+function loadCredentials(crendentialsFile){
   log.i('Load google credentials');
-  fs.readFile(appOptions.credentialsFile)
+  fs.readFile(crendentialsFile)
     .then(result => authorize(JSON.parse(result)))
     .catch(err => log.e('Error loading client secret file:', err));
   return {
