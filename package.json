@@ -1,5 +1,5 @@
 {
-  "name": "google-app-electron",
+  "name": "google-drive-manager",
   "version": "1.0.0",
   "description": "Google service in app manager",
   "main": "index.js",
