@@ -2,8 +2,9 @@
   "name": "google-drive-manager",
   "version": "1.0.0",
   "description": "Google service in app manager",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
+    "test": "./node_modules/.bin/mocha ./test/test.js"
   },
   "repository": {
     "type": "git",
@@ -19,7 +20,9 @@
     "googleapis": "^27.0.0"
   },
   "devDependencies": {
+    "chai": "^4.2.0",
     "eslint": "^5.10.0",
-    "eslint-config-google": "^0.11.0"
+    "eslint-config-google": "^0.11.0",
+    "mocha": "^5.2.0"
   }
 }
