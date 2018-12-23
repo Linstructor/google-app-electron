@@ -114,7 +114,7 @@ function loadCredentials(credentialsFile, ){
  * @param options
  * @param options.tokenFile File which contains user token or the file where the token should be stored
  * @param options.credentialsFile File which contains Google Oauth API informations
- * @returns {{driveEmitter: AppEmitter, events: {Object}}}
+ * @returns {{emitter: AppEmitter, events: {Object}}}
  */
 module.exports = (options) => {
   manageOptions(options);
@@ -146,7 +146,7 @@ module.exports = (options) => {
   });
 
   return {
-    driveEmitter: emitter,
+    emitter,
     events
   };
 
