@@ -71,9 +71,9 @@ function getAccessToken() {
 function validateCode(code) {
   return new Promise((resolve, reject) => {
     oauthClient.getToken(code)
-      .then(token => {
-        oauthClient.setCredentials(token);
-        return resolve(token);
+      .then(res => {
+        oauthClient.setCredentials(res.tokens);
+        return resolve(res.tokens);
       })
       .catch(err => reject(err));
   });
@@ -86,6 +86,7 @@ function validateCode(code) {
  * @return {Promise<void | Error>}
  */
 function writeToken(tokenFile, token) {
+  log.i('Token file created');
   return fs.writeFile(tokenFile, JSON.stringify(token));
 }
 
@@ -114,7 +115,7 @@ function loadCredentials(credentialsFile, ){
  * @param options
  * @param options.tokenFile File which contains user token or the file where the token should be stored
  * @param options.credentialsFile File which contains Google Oauth API informations
- * @returns {{emitter: AppEmitter, events: {Object}}}
+ * @returns {{emitter: AppEmitter, events: {events}}}
  */
 module.exports = (options) => {
   manageOptions(options);
