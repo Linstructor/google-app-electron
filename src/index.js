@@ -10,8 +10,12 @@ const {google, GoogleApis} = require('googleapis');
 const EventEmitter = require('events');
 
 
+let log = null;
 
-class AppEmitter extends EventEmitter {
+/**
+ * Drive manager
+ */
+class DriveManager extends EventEmitter {
   constructor(options) {
     super();
     if (options.tokenFile === undefined || options.tokenFile === '') throw new Error('No token file in options');
@@ -30,42 +34,7 @@ class AppEmitter extends EventEmitter {
 
     this.SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-    this.log = {
-      i: msg => {if(this.appOptions.debug) console.log(msg)},
-      e: (msg, err = {}) => {if(this.appOptions.debug) console.error(msg, err)},
-    };
-  }
-
-  /**
-   * Create an OAuth2 client with the given credentials
-   * @param {Object} credentials The authorization client credentials.
-   */
-  initOAuth2Client(credentials) {
-    const {client_secret, client_id, redirect_uris} = credentials.installed;
-    this.oauthClient = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-  }
-
-  /**
-   * Read the token file
-   * @param tokenFile path
-   * @return {Promise<Buffer>}
-   */
-  getTokenFile(tokenFile){
-    this.log.i('Check if there is already an user token');
-    return fs.readFile(tokenFile);
-  }
-
-  /**
-   * Create Oauth2 confirmation url
-   * @return Promise<String> Url to get Google user's token
-   */
-  getAccessToken() {
-    return new Promise(resolve => {
-      resolve(this.oauthClient.generateAuthUrl({
-        access_type: 'offline',
-        scope: this.SCOPES,
-      }))
-    });
+    this.drive = null;
   }
 
   /**
@@ -85,59 +54,105 @@ class AppEmitter extends EventEmitter {
   }
 
   /**
-   * Store token file
-   * @param tokenFile
-   * @param token
-   * @return {Promise<void | Error>}
+   * Init drive object
    */
-  writeToken(tokenFile, token) {
-    this.log.i('Token file created');
-    return fs.writeFile(tokenFile, JSON.stringify(token));
+  initDrive() {
+    this.drive = google.drive({version: 'v3', auth: this.oauthClient});
   }
+}
 
-  /**
-   * Get credentials information
-   * @param credentialsFile File where Google Oauth APU is stored
-   * @returns {Promise<Object | Error>}
-   */
-  loadCredentials(credentialsFile, ){
-    this.log.i('Load google credentials');
-    return fs.readFile(credentialsFile);
-  }
+/**
+ * Create an OAuth2 client with the given credentials
+ * @param {Object} credentials The authorization client credentials.
+ * @param oauthClient
+ */
+function initOAuth2Client(credentials) {
+  const {client_secret, client_id, redirect_uris} = credentials.installed;
+  return new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+}
 
-  init() {
-    this.loadCredentials(this.appOptions.credentialsFile)
-      .then(credentials => {
-        this.initOAuth2Client(JSON.parse(credentials));
-        this.getTokenFile(this.appOptions.tokenFile)
-          .then(token => {
-            this.oauthClient.setCredentials(JSON.parse(token));
-            this.emit(this.events.READY);
-          })
-          .catch(err => {
-            if (err) {
-              this.log.i('No user token found');
-              this.getAccessToken().then((url) => this.emit(this.events.AUTH_REQUEST, url));
-            }
-          });
-      })
-      .catch(err => {throw new Error('Error loading credentials: ' + err.message)});
+/**
+ * Read the token file
+ * @param tokenFile path
+ * @return {Promise<Buffer>}
+ */
+function getTokenFile(tokenFile){
+  log.i('Check if there is already an user token');
+  return fs.readFile(tokenFile);
+}
 
-    this.on(this.events.VALID_CODE, (code) => {
-      this.validateCode(code).then((token) => {
-        this.writeToken(this.appOptions.tokenFile, token)
-          .then(() => this.emit(this.events.READY))
-          .catch(err => {throw err;})
-      });
-    });
-  }
+/**
+ * Create Oauth2 confirmation url
+ * @return Promise<String> Url to get Google user's token
+ */
+function getAccessToken(oauthClient) {
+  return new Promise(resolve => {
+    resolve(oauthClient.generateAuthUrl({
+      access_type: 'offline',
+      scope: this.SCOPES,
+    }))
+  });
+}
+
+/**
+ * Store token file
+ * @param tokenFile
+ * @param token
+ * @return {Promise<void | Error>}
+ */
+function writeToken(tokenFile, token) {
+  log.i('Token file created');
+  return fs.writeFile(tokenFile, JSON.stringify(token));
+}
+
+/**
+ * Get credentials information
+ * @param credentialsFile File where Google Oauth APU is stored
+ * @returns {Promise<Object | Error>}
+ */
+function loadCredentials(credentialsFile, ){
+  log.i('Load google credentials');
+  return fs.readFile(credentialsFile);
 }
 
 /**
  * Get drive manager with the given options
  * @param options
- * @return {AppEmitter}
+ * @return {DriveManager}
  */
 module.exports = (options) => {
-  return new AppEmitter(options);
+  const manager = new DriveManager(options);
+  log = {
+    i: msg => {if(options.debug) console.log(msg)},
+    e: (msg, err = {}) => {if(options.debug) console.error(msg, err)},
+  };
+  loadCredentials(options.credentialsFile)
+    .then(credentials => {
+      manager.oauthClient = initOAuth2Client(JSON.parse(credentials));
+      getTokenFile(options.tokenFile)
+        .then(token => {
+          manager.oauthClient.setCredentials(JSON.parse(token));
+          manager.drive = google.drive({version: 'v3', auth: this.oauthClient});
+          manager.emit(manager.events.READY);
+        })
+        .catch(err => {
+          if (err) {
+            log.i('No user token found');
+            getAccessToken(manager.oauthClient).then((url) => manager.emit(manager.events.AUTH_REQUEST, url));
+          }
+        });
+    })
+    .catch(err => {throw new Error('Error loading credentials: ' + err.message)});
+
+  manager.on(manager.events.VALID_CODE, (code) => {
+    manager.validateCode(code).then((token) => {
+      writeToken(manager.appOptions.tokenFile, token)
+        .then(() => {
+          manager.drive = google.drive({version: 'v3', auth: this.oauthClient});
+          manager.emit(manager.events.READY);
+        })
+        .catch(err => {throw err;})
+    });
+  });
+  return manager;
 };
