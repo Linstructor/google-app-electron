@@ -8,147 +8,136 @@
 const fs = require('fs').promises;
 const {google, GoogleApis} = require('googleapis');
 const EventEmitter = require('events');
-class AppEmitter extends EventEmitter {}
 
-const emitter = new AppEmitter();
 
-/** @type GoogleApis*/
-let oauthClient = null;
 
-/** @type Object*/
-let appOptions = {};
+class AppEmitter extends EventEmitter {
+  constructor(options) {
+    super();
+    if (options.tokenFile === undefined || options.tokenFile === '') throw new Error('No token file in options');
+    if (options.credentialsFile === undefined || options.credentialsFile === '') throw new Error('No credentials file in options');
 
-const log = {
-  i: msg => {if(appOptions.debug) console.log(msg)},
-  e: (msg, err = {}) => {if(appOptions.debug) console.error(msg, err)},
-};
+    this.appOptions = options;
 
-const events = {
-  READY: 'auth-loaded',
-  AUTH_REQUEST: 'auth-request',
-  VALID_CODE: 'valid-code'
-};
+    /** @type GoogleApis*/
+    this.oauthClient = null;
 
-const SCOPES = ['https://www.googleapis.com/auth/drive'];
+    this.events = {
+      READY: 'auth-loaded',
+      AUTH_REQUEST: 'auth-request',
+      VALID_CODE: 'valid-code'
+    };
 
-/**
- * Create an OAuth2 client with the given credentials
- * @param {Object} credentials The authorization client credentials.
- */
-function initOAuth2Client(credentials) {
-  const {client_secret, client_id, redirect_uris} = credentials.installed;
-  oauthClient = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-}
+    this.SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-/**
- * Read the token file
- * @param tokenFile path
- * @return {Promise<Buffer>}
- */
-function getTokenFile(tokenFile){
-  log.i('Check if there is already an user token');
-  return fs.readFile(tokenFile);
-}
+    this.log = {
+      i: msg => {if(this.appOptions.debug) console.log(msg)},
+      e: (msg, err = {}) => {if(this.appOptions.debug) console.error(msg, err)},
+    };
+  }
 
-/**
- * Create Oauth2 confirmation url
- * @return Promise<String> Url to get Google user's token
- */
-function getAccessToken() {
-  return new Promise(resolve => {
-    resolve(oauthClient.generateAuthUrl({
-      access_type: 'offline',
-      scope: SCOPES,
-    }))
-  });
-}
+  /**
+   * Create an OAuth2 client with the given credentials
+   * @param {Object} credentials The authorization client credentials.
+   */
+  initOAuth2Client(credentials) {
+    const {client_secret, client_id, redirect_uris} = credentials.installed;
+    this.oauthClient = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+  }
 
-/**
- * Get token from the code return by google
- * @param code
- * @return {Promise<token|Error>}
- */
-function validateCode(code) {
-  return new Promise((resolve, reject) => {
-    oauthClient.getToken(code)
-      .then(res => {
-        oauthClient.setCredentials(res.tokens);
-        return resolve(res.tokens);
+  /**
+   * Read the token file
+   * @param tokenFile path
+   * @return {Promise<Buffer>}
+   */
+  getTokenFile(tokenFile){
+    this.log.i('Check if there is already an user token');
+    return fs.readFile(tokenFile);
+  }
+
+  /**
+   * Create Oauth2 confirmation url
+   * @return Promise<String> Url to get Google user's token
+   */
+  getAccessToken() {
+    return new Promise(resolve => {
+      resolve(this.oauthClient.generateAuthUrl({
+        access_type: 'offline',
+        scope: this.SCOPES,
+      }))
+    });
+  }
+
+  /**
+   * Get token from the code return by google
+   * @param code
+   * @return {Promise<token|Error>}
+   */
+  validateCode(code) {
+    return new Promise((resolve, reject) => {
+      this.oauthClient.getToken(code)
+        .then(res => {
+          this.oauthClient.setCredentials(res.tokens);
+          return resolve(res.tokens);
+        })
+        .catch(err => reject(err));
+    });
+  }
+
+  /**
+   * Store token file
+   * @param tokenFile
+   * @param token
+   * @return {Promise<void | Error>}
+   */
+  writeToken(tokenFile, token) {
+    this.log.i('Token file created');
+    return fs.writeFile(tokenFile, JSON.stringify(token));
+  }
+
+  /**
+   * Get credentials information
+   * @param credentialsFile File where Google Oauth APU is stored
+   * @returns {Promise<Object | Error>}
+   */
+  loadCredentials(credentialsFile, ){
+    this.log.i('Load google credentials');
+    return fs.readFile(credentialsFile);
+  }
+
+  init() {
+    this.loadCredentials(this.appOptions.credentialsFile)
+      .then(credentials => {
+        this.initOAuth2Client(JSON.parse(credentials));
+        this.getTokenFile(this.appOptions.tokenFile)
+          .then(token => {
+            this.oauthClient.setCredentials(JSON.parse(token));
+            this.emit(this.events.READY);
+          })
+          .catch(err => {
+            if (err) {
+              this.log.i('No user token found');
+              this.getAccessToken().then((url) => this.emit(this.events.AUTH_REQUEST, url));
+            }
+          });
       })
-      .catch(err => reject(err));
-  });
+      .catch(err => {throw new Error('Error loading credentials: ' + err.message)});
+
+    this.on(this.events.VALID_CODE, (code) => {
+      this.validateCode(code).then((token) => {
+        this.writeToken(this.appOptions.tokenFile, token)
+          .then(() => this.emit(this.events.READY))
+          .catch(err => {throw err;})
+      });
+    });
+  }
 }
 
 /**
- * Store token file
- * @param tokenFile
- * @param token
- * @return {Promise<void | Error>}
- */
-function writeToken(tokenFile, token) {
-  log.i('Token file created');
-  return fs.writeFile(tokenFile, JSON.stringify(token));
-}
-
-/**
- * Check and init options in the module
+ * Get drive manager with the given options
  * @param options
- */
-function manageOptions(options) {
-  if (options.tokenFile === undefined || options.tokenFile === '') throw new Error('No token file in options');
-  if (options.credentialsFile === undefined || options.credentialsFile === '') throw new Error('No credentials file in options');
-  appOptions = options;
-}
-
-/**
- * Get credentials information
- * @param credentialsFile File where Google Oauth APU is stored
- * @returns {Promise<Object | Error>}
- */
-function loadCredentials(credentialsFile, ){
-  log.i('Load google credentials');
-  return fs.readFile(credentialsFile);
-}
-
-/**
- * Init google drive API and manager objects
- * @param options
- * @param options.tokenFile File which contains user token or the file where the token should be stored
- * @param options.credentialsFile File which contains Google Oauth API informations
- * @returns {{emitter: AppEmitter, events: {events}}}
+ * @return {AppEmitter}
  */
 module.exports = (options) => {
-  manageOptions(options);
-
-  loadCredentials(options.credentialsFile)
-    .then(crendentials => {
-      initOAuth2Client(JSON.parse(crendentials));
-      getTokenFile(options.tokenFile)
-        .then(token => {
-          oauthClient.setCredentials(JSON.parse(token));
-          emitter.emit(events.READY);
-        })
-        .catch(err => {
-          if (err) {
-            log.i('No user token found');
-            getAccessToken().then((url) => emitter.emit(events.AUTH_REQUEST, url));
-          }
-        });
-    })
-    .catch(err => {throw new Error('Error loading credentials')});
-
-  emitter.on(events.VALID_CODE, (code) => {
-    validateCode(code).then((token) => {
-      writeToken(appOptions.tokenFile, token)
-        .then(() => emitter.emit(events.READY))
-        .catch(err => {throw err;})
-    });
-
-  });
-
-  return {
-    emitter,
-    events
-  };
-
+  return new AppEmitter(options);
 };
