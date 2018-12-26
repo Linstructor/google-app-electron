@@ -34,6 +34,8 @@ class DriveManager extends EventEmitter {
       VALID_CODE: 'valid-code'
     };
 
+    this.on(this.events.READY, () => initDrive(this.drive, this.oauthClient));
+
     this.drive = null;
   }
 
@@ -52,13 +54,13 @@ class DriveManager extends EventEmitter {
         .catch(err => reject(err));
     });
   }
+}
 
-  /**
-   * Init drive object
-   */
-  initDrive() {
-    this.drive = google.drive({version: 'v3', auth: this.oauthClient});
-  }
+/**
+ * Init drive object
+ */
+function initDrive(drive, oauthClient) {
+  drive = google.drive({version: 'v3', auth: oauthClient});
 }
 
 /**
