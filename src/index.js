@@ -64,6 +64,7 @@ class DriveManager extends EventEmitter {
 /**
  * Create an OAuth2 client with the given credentials
  * @param {Object} credentials The authorization client credentials.
+ * @param oauthClient
  */
 function initOAuth2Client(credentials) {
   const {client_secret, client_id, redirect_uris} = credentials.installed;
@@ -88,7 +89,7 @@ function getAccessToken(oauthClient) {
   return new Promise(resolve => {
     resolve(oauthClient.generateAuthUrl({
       access_type: 'offline',
-      scope: this.SCOPES,
+      scope: SCOPES,
     }))
   });
 }
