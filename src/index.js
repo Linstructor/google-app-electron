@@ -12,6 +12,8 @@ const EventEmitter = require('events');
 
 let log = null;
 
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
+
 /**
  * Drive manager
  */
@@ -31,8 +33,6 @@ class DriveManager extends EventEmitter {
       AUTH_REQUEST: 'auth-request',
       VALID_CODE: 'valid-code'
     };
-
-    this.SCOPES = ['https://www.googleapis.com/auth/drive'];
 
     this.drive = null;
   }
@@ -64,7 +64,6 @@ class DriveManager extends EventEmitter {
 /**
  * Create an OAuth2 client with the given credentials
  * @param {Object} credentials The authorization client credentials.
- * @param oauthClient
  */
 function initOAuth2Client(credentials) {
   const {client_secret, client_id, redirect_uris} = credentials.installed;
