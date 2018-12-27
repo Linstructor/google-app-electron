@@ -134,7 +134,7 @@ module.exports = (options) => {
       getTokenFile(options.tokenFile)
         .then(token => {
           manager.oauthClient.setCredentials(JSON.parse(token));
-          manager.drive = google.drive({version: 'v3', auth: this.oauthClient});
+          manager.drive = google.drive({version: 'v3', auth: manager.oauthClient});
           manager.emit(manager.events.READY);
         })
         .catch(err => {
@@ -150,7 +150,7 @@ module.exports = (options) => {
     manager.validateCode(code).then((token) => {
       writeToken(manager.appOptions.tokenFile, token)
         .then(() => {
-          manager.drive = google.drive({version: 'v3', auth: this.oauthClient});
+          manager.drive = google.drive({version: 'v3', auth: manager.oauthClient});
           manager.emit(manager.events.READY);
         })
         .catch(err => {throw err;})
